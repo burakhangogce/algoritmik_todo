@@ -41,6 +41,8 @@ dependencies:
   google_fonts: ^2.2.0
   date_picker_timeline: ^1.2.3
   sqflite: ^2.0.1
+  flutter_staggered_animations: ^1.0.0
+  rxdart: ^0.27.2
 
 dev_dependencies:
   flutter_test:

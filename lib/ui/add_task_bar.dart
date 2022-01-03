@@ -1,5 +1,6 @@
 import 'package:algoritmik_todo/contrellers/task_controller.dart';
 import 'package:algoritmik_todo/models/task.dart';
+import 'package:algoritmik_todo/services/notification_api.dart';
 import 'package:algoritmik_todo/ui/theme.dart';
 import 'package:algoritmik_todo/ui/widgets/button.dart';
 import 'package:algoritmik_todo/ui/widgets/input_field.dart';
@@ -187,6 +188,19 @@ class _AddTaskPageState extends State<AddTaskPage> {
       color: _selectedColor,
       isCompleted: 0,
     ));
+    final toDate = DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day,
+        int.parse(_startTime.split(":")[0]),
+        int.parse(_startTime.split(":")[1].split(" ")[0]));
+    var diff = toDate.difference(DateTime.now()).inSeconds;
+    NotificationApi.showScheduledNotification(
+      title: _titleController.text,
+      body: _noteController.text,
+      payload: "nivedita datta",
+      scheduledDate: DateTime.now().add(Duration(seconds: diff)),
+    );
     print("My did is " + "$value");
   }
 
@@ -287,9 +301,13 @@ class _AddTaskPageState extends State<AddTaskPage> {
   }
 
   _getTimeFromUser({required bool isStartTime}) async {
-    var pickedTime = await _showTimePicker();
-    String _formattedTime = pickedTime.format(context);
-    if (pickedTime == null) {
+    final TimeOfDay picked = await _showTimePicker();
+    String _formattedTime =
+        picked.hour.toString() + ':' + picked.minute.toString() + ':00';
+    _formattedTime = DateFormat.jm()
+        .format(DateFormat("hh:mm:ss").parse(_formattedTime))
+        .toString();
+    if (picked == null) {
       print("Time canceld");
     } else if (isStartTime == true) {
       setState(() {

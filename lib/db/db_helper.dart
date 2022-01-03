@@ -15,7 +15,7 @@ class DBHelper {
       _db =
           await openDatabase(_path, version: _version, onCreate: (db, version) {
         print("creating new a one");
-        return db.execute("CREATE TABE $_tableName("
+        return db.execute("CREATE TABLE $_tableName("
             "id INTEGER PRIMARY KEY AUTOINCREMENT, "
             "title STRİNG, note TEXT, date STRING, "
             "startTime STRİNG, endTime STRING, "
@@ -31,5 +31,22 @@ class DBHelper {
   static Future<int> insert(Task? task) async {
     print("insert function called");
     return await _db?.insert(_tableName, task!.toJson()) ?? 1;
+  }
+
+  static Future<List<Map<String, dynamic>>> query() async {
+    print("query function called");
+    return await _db!.query(_tableName);
+  }
+
+  static delete(Task task) async {
+    return await _db!.delete(_tableName, where: 'id=?', whereArgs: [task.id]);
+  }
+
+  static update(int id) async {
+    return await _db!.rawUpdate('''
+    UPDATE tasks
+    SET isCompleted = ?
+    Where id=?
+    ''', [1, id]);
   }
 }

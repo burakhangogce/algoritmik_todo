@@ -1,13 +1,21 @@
+import 'package:algoritmik_todo/contrellers/task_controller.dart';
+import 'package:algoritmik_todo/models/task.dart';
+import 'package:algoritmik_todo/services/notification_api.dart';
 import 'package:algoritmik_todo/services/notification_services.dart';
 import 'package:algoritmik_todo/services/theme_services.dart';
 import 'package:algoritmik_todo/ui/add_task_bar.dart';
+import 'package:algoritmik_todo/ui/second.dart';
 import 'package:algoritmik_todo/ui/theme.dart';
 import 'package:algoritmik_todo/ui/widgets/button.dart';
+import 'package:algoritmik_todo/ui/widgets/task_tile.dart';
 import 'package:date_picker_timeline/date_picker_widget.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_native_timezone/flutter_native_timezone.dart';
+import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:timezone/timezone.dart' as tz;
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -17,8 +25,18 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  final _taskController = Get.put(TaskController());
   var notifyHelper;
   DateTime _selectedDate = DateTime.now();
+
+  void listenNotifications() =>
+      NotificationApi.onNotifications.stream.listen(onClickedNotification);
+
+  void onClickedNotification(String? payload) =>
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (context) => SecondPage(payload: payload),
+      ));
+
   @override
   void initState() {
     // TODO: implement initState
@@ -26,6 +44,10 @@ class _HomePageState extends State<HomePage> {
     notifyHelper = NotifyHelper();
     notifyHelper.initializeNotification();
     notifyHelper.requestIOSPermissions();
+    NotificationApi.init().whenComplete(() {
+      setState(() {});
+    });
+    listenNotifications();
   }
 
   @override
@@ -37,7 +59,166 @@ class _HomePageState extends State<HomePage> {
         children: [
           _addTaskBar(),
           _addDateBar(),
+          SizedBox(
+            height: 10,
+          ),
+          _showTasks(),
         ],
+      ),
+    );
+  }
+
+  _showTasks() {
+    return Expanded(
+      child: Obx(() {
+        return ListView.builder(
+          itemCount: _taskController.taskList.length,
+          itemBuilder: (_, index) {
+            Task task = _taskController.taskList[index];
+            print(task.toJson());
+            if (task.repeat == 'Daily') {
+              DateTime date = DateFormat.jm().parse(task.startTime.toString());
+              var myTime = DateFormat("HH:mm").format(date);
+              /*notifyHelper.scheduledNotification(
+                  int.parse(myTime.toString().split(":")[0]),
+                  int.parse(myTime.toString().split(":")[1]),
+                  task);
+                  */
+              return AnimationConfiguration.staggeredGrid(
+                  position: index,
+                  columnCount: 3,
+                  child: SlideAnimation(
+                    child: FadeInAnimation(
+                      child: Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              _showBottomSheet(context, task);
+                            },
+                            child: TaskTile(task),
+                          )
+                        ],
+                      ),
+                    ),
+                  ));
+            }
+            if (task.date == DateFormat.yMd().format(_selectedDate)) {
+              return AnimationConfiguration.staggeredGrid(
+                  position: index,
+                  columnCount: 3,
+                  child: SlideAnimation(
+                    child: FadeInAnimation(
+                      child: Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              _showBottomSheet(context, task);
+                            },
+                            child: TaskTile(task),
+                          )
+                        ],
+                      ),
+                    ),
+                  ));
+            } else {
+              return Container();
+            }
+          },
+        );
+      }),
+    );
+  }
+
+  _showBottomSheet(BuildContext context, Task task) {
+    Get.bottomSheet(
+      Container(
+        padding: const EdgeInsets.only(top: 4),
+        height: task.isCompleted == 1
+            ? MediaQuery.of(context).size.height * 0.28
+            : MediaQuery.of(context).size.height * 0.38,
+        color: Get.isDarkMode ? darkGreyClr : Colors.white,
+        child: Column(
+          children: [
+            Container(
+              height: 6,
+              width: 120,
+              decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  color: Get.isDarkMode ? Colors.grey[600] : Colors.grey[300]),
+            ),
+            Spacer(),
+            task.isCompleted == 1
+                ? Container()
+                : _bottomSheetButton(
+                    label: "Task Completed",
+                    onTap: () {
+                      _taskController.markTaskCompleted(task.id!);
+                      Get.back();
+                    },
+                    clr: primaryClr,
+                    context: context),
+            SizedBox(
+              height: 20,
+            ),
+            _bottomSheetButton(
+                label: "Delete Task",
+                onTap: () {
+                  _taskController.delete(task);
+                  Get.back();
+                },
+                clr: Colors.red[300]!,
+                context: context),
+            SizedBox(
+              height: 20,
+            ),
+            _bottomSheetButton(
+                label: "Close",
+                onTap: () {
+                  Get.back();
+                },
+                clr: Colors.red[300]!,
+                isClose: true,
+                context: context),
+            SizedBox(
+              height: 10,
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  _bottomSheetButton(
+      {required String label,
+      required Function()? onTap,
+      required Color clr,
+      bool isClose = false,
+      required BuildContext context}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: EdgeInsets.symmetric(
+          vertical: 4,
+        ),
+        height: 55,
+        width: MediaQuery.of(context).size.width * 0.9,
+        decoration: BoxDecoration(
+            border: Border.all(
+                width: 2,
+                color: isClose == true
+                    ? Get.isDarkMode
+                        ? Colors.grey[600]!
+                        : Colors.grey[300]!
+                    : clr),
+            borderRadius: BorderRadius.circular(20),
+            color: isClose == true ? Colors.transparent : clr),
+        child: Center(
+          child: Text(
+            label,
+            style:
+                isClose ? titleStyle : titleStyle.copyWith(color: Colors.white),
+          ),
+        ),
       ),
     );
   }
@@ -63,7 +244,12 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
           ),
-          MyButton(label: "+ Add Task", onTap: () => Get.to(AddTaskPage())),
+          MyButton(
+              label: "+ Add Task",
+              onTap: () async {
+                await Get.to(() => AddTaskPage());
+                _taskController.getTasks();
+              }),
         ],
       ),
     );
@@ -89,7 +275,9 @@ class _HomePageState extends State<HomePage> {
             textStyle: TextStyle(
                 fontSize: 14, fontWeight: FontWeight.w600, color: Colors.grey)),
         onDateChange: (date) {
-          _selectedDate = date;
+          setState(() {
+            _selectedDate = date;
+          });
         },
       ),
     );
@@ -106,7 +294,7 @@ class _HomePageState extends State<HomePage> {
               body: Get.isDarkMode
                   ? "Activated Dark Theme"
                   : "Activated Light Theme");
-          notifyHelper.scheduledNotification();
+          //notifyHelper.scheduledNotification();
         },
         child: Icon(
           Icons.nightlight_round,
